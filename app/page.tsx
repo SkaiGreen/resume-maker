@@ -16,6 +16,15 @@ const questions = [
   },
   {
     id: 2,
+    title: "Your Work Experience",
+    subtitle: "Share your professional journey",
+    question:
+      "Tell us about your work experience - the companies you've worked for, your roles, and what you accomplished there.",
+    description:
+      "Spend 1-2 minutes talking about each company you've worked for. Include: company names, when you worked there, your job titles, and specific things you did or achieved. Like: 'I worked at ABC Corp from 2020-2023 as a Marketing Manager where I launched 3 successful campaigns and increased social media engagement by 40%.'",
+  },
+  {
+    id: 3,
     title: "Your Best Achievement",
     subtitle: "Share your proudest work moment",
     question: "What's your biggest work accomplishment?",
@@ -23,7 +32,7 @@ const questions = [
       "Share one thing you're proud of at work. Use numbers if possible. Like: 'I increased sales by 25%' or 'I trained 10 new employees.'",
   },
   {
-    id: 3,
+    id: 4,
     title: "Your Skills",
     subtitle: "Tell us what you're good with",
     question: "What software, tools, or skills do you know well?",
@@ -31,7 +40,7 @@ const questions = [
       "List what you're good with - software, languages, or abilities. Like: 'Excel, Spanish, customer service, and managing social media accounts.'",
   },
   {
-    id: 4,
+    id: 5,
     title: "Your Education",
     subtitle: "Share your educational background",
     question: "What's your educational background?",
@@ -253,7 +262,7 @@ export default function AudioFlashcards() {
                     </span>
                   </h2>
                   <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base px-2">
-                    Simply answer 4 quick questions with your voice, and we'll craft a professional, editable Word
+                    Simply answer 5 quick questions with your voice, and we'll craft a professional, editable Word
                     document resume tailored just for you.
                   </p>
 
@@ -324,7 +333,7 @@ export default function AudioFlashcards() {
           <div className="w-full max-w-md">
             <div className="bg-gradient-to-br from-purple-600/10 to-pink-600/10 border border-purple-200 p-4 sm:p-8 rounded-3xl shadow-xl">
               <div className="bg-white rounded-2xl p-4 sm:p-8 text-center shadow-inner">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg">
                   <Check className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 sm:mb-4">
@@ -456,8 +465,8 @@ export default function AudioFlashcards() {
               {/* Success indicator */}
               {hasRecording && (
                 <div className="flex items-center justify-center mb-4 sm:mb-6">
-                  <div className="flex items-center text-emerald-600 bg-emerald-50 px-3 sm:px-4 py-2 rounded-full border border-emerald-200">
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 bg-emerald-500 rounded-full flex items-center justify-center mr-2">
+                  <div className="flex items-center text-purple-700 bg-purple-50 px-3 sm:px-4 py-2 rounded-full border border-purple-200">
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 bg-purple-600 rounded-full flex items-center justify-center mr-2">
                       <Check className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
                     </div>
                     <span className="text-xs sm:text-sm font-semibold">Answer recorded successfully</span>
@@ -474,7 +483,6 @@ export default function AudioFlashcards() {
                   >
                     Next Question
                     <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1" />
-                    <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 -ml-2" />
                   </Button>
                 )}
 
@@ -482,7 +490,7 @@ export default function AudioFlashcards() {
                   <Button
                     onClick={submitAnswers}
                     disabled={isSubmitting}
-                    className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-2xl font-semibold shadow-lg disabled:opacity-50 text-sm sm:text-base"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-2xl font-semibold shadow-lg disabled:opacity-50 text-sm sm:text-base"
                   >
                     {isSubmitting ? (
                       <>
