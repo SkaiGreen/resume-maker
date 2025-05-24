@@ -147,23 +147,49 @@ export default function AudioFlashcards() {
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData()
+      const audioUrls: { [key: string]: string } = {}
 
-      // Add email
-      formData.append("email", email)
-
-      // Add each recording
-      Object.entries(recordings).forEach(([questionIndex, blob]) => {
+      // Upload each recording and get URLs
+      for (const [questionIndex, blob] of Object.entries(recordings)) {
         const questionNumber = Number.parseInt(questionIndex) + 1
-        formData.append(`question_${questionNumber}`, blob, `question_${questionNumber}.webm`)
-      })
 
-      formData.append("questions_data", JSON.stringify(questions))
-      formData.append("submission_time", new Date().toISOString())
+        // Convert blob to File with .mp4 extension
+        const audioFile = new File([blob], `question_${questionNumber}.mp4`, {
+          type: "audio/mp4",
+        })
+
+        // Create FormData for file upload
+        const uploadFormData = new FormData()
+        uploadFormData.append("file", audioFile)
+
+        // Upload to a file hosting service (you'll need to replace this URL with your actual file upload endpoint)
+        const uploadResponse = await fetch("/api/upload-audio", {
+          method: "POST",
+          body: uploadFormData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload audio for question ${questionNumber}`)
+        }
+
+        const uploadResult = await uploadResponse.json()
+        audioUrls[`question_${questionNumber}_url`] = uploadResult.url
+      }
+
+      // Send data to webhook with audio URLs instead of raw files
+      const webhookData = {
+        email: email,
+        audio_urls: audioUrls,
+        questions_data: questions,
+        submission_time: new Date().toISOString(),
+      }
 
       const response = await fetch("https://hook.eu2.make.com/rdcc15sij24hfvydepw37lbgban7f10g", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(webhookData),
       })
 
       if (response.ok) {
