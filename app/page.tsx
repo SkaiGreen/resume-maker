@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mic, Play, Pause, ArrowRight, Check, Sparkles, Clock, FileText, ArrowLeft, CreditCard } from "lucide-react"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 const questions = [
   {
@@ -147,34 +150,39 @@ export default function AudioFlashcards() {
     setIsSubmitting(true)
 
     try {
-      const audioData: { [key: string]: string } = {}
+      const audioUrls: { [key: string]: string } = {}
+      const timestamp = Date.now()
+      const sessionId = Math.random().toString(36).substring(2, 15)
 
-      // Convert each recording to base64
+      // Upload each recording to Supabase Storage
       for (const [questionIndex, blob] of Object.entries(recordings)) {
         const questionNumber = Number.parseInt(questionIndex) + 1
+        const fileName = `${sessionId}_question_${questionNumber}_${timestamp}.webm`
 
-        // Convert blob to base64
-        const base64Audio = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            const base64String = reader.result as string
-            // Remove the data:audio/webm;base64, prefix
-            const base64Data = base64String.split(",")[1]
-            resolve(base64Data)
-          }
-          reader.readAsDataURL(blob)
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage.from("audio-recordings").upload(fileName, blob, {
+          contentType: "audio/webm",
+          upsert: false,
         })
 
-        audioData[`question_${questionNumber}_audio`] = base64Audio
-        audioData[`question_${questionNumber}_filename`] = `question_${questionNumber}.webm`
+        if (error) {
+          console.error("Upload error:", error)
+          throw new Error(`Failed to upload audio for question ${questionNumber}: ${error.message}`)
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName)
+
+        audioUrls[`question_${questionNumber}_url`] = urlData.publicUrl
       }
 
-      // Send data to webhook
+      // Send data to webhook with audio URLs
       const webhookData = {
         email: email,
-        audio_files: audioData,
+        audio_urls: audioUrls,
         questions_data: questions,
         submission_time: new Date().toISOString(),
+        session_id: sessionId,
       }
 
       const response = await fetch("https://hook.eu2.make.com/rdcc15sij24hfvydepw37lbgban7f10g", {
@@ -188,11 +196,11 @@ export default function AudioFlashcards() {
       if (response.ok) {
         setAppState("submitted")
       } else {
-        throw new Error("Failed to submit")
+        throw new Error(`Webhook failed with status: ${response.status}`)
       }
     } catch (error) {
       console.error("Error submitting answers:", error)
-      alert("Failed to submit answers. Please try again.")
+      alert(`Failed to submit answers: ${error.message}. Please try again.`)
     } finally {
       setIsSubmitting(false)
     }
