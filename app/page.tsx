@@ -147,39 +147,32 @@ export default function AudioFlashcards() {
     setIsSubmitting(true)
 
     try {
-      const audioUrls: { [key: string]: string } = {}
+      const audioData: { [key: string]: string } = {}
 
-      // Upload each recording and get URLs
+      // Convert each recording to base64
       for (const [questionIndex, blob] of Object.entries(recordings)) {
         const questionNumber = Number.parseInt(questionIndex) + 1
 
-        // Convert blob to File with .mp4 extension
-        const audioFile = new File([blob], `question_${questionNumber}.mp4`, {
-          type: "audio/mp4",
+        // Convert blob to base64
+        const base64Audio = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            const base64String = reader.result as string
+            // Remove the data:audio/webm;base64, prefix
+            const base64Data = base64String.split(",")[1]
+            resolve(base64Data)
+          }
+          reader.readAsDataURL(blob)
         })
 
-        // Create FormData for file upload
-        const uploadFormData = new FormData()
-        uploadFormData.append("file", audioFile)
-
-        // Upload to a file hosting service (you'll need to replace this URL with your actual file upload endpoint)
-        const uploadResponse = await fetch("/api/upload-audio", {
-          method: "POST",
-          body: uploadFormData,
-        })
-
-        if (!uploadResponse.ok) {
-          throw new Error(`Failed to upload audio for question ${questionNumber}`)
-        }
-
-        const uploadResult = await uploadResponse.json()
-        audioUrls[`question_${questionNumber}_url`] = uploadResult.url
+        audioData[`question_${questionNumber}_audio`] = base64Audio
+        audioData[`question_${questionNumber}_filename`] = `question_${questionNumber}.webm`
       }
 
-      // Send data to webhook with audio URLs instead of raw files
+      // Send data to webhook
       const webhookData = {
         email: email,
-        audio_urls: audioUrls,
+        audio_files: audioData,
         questions_data: questions,
         submission_time: new Date().toISOString(),
       }
