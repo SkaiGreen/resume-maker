@@ -181,7 +181,7 @@ export default function AudioFlashcards() {
   // Header Component
   const Header = () => (
     <div className="w-full max-w-lg mx-auto mb-4 px-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <Button
           onClick={() => window.open("https://toolstolaunch.com/", "_blank")}
           variant="outline"
@@ -192,21 +192,33 @@ export default function AudioFlashcards() {
           Go Back
         </Button>
 
-        <div className="text-center">
+        {/* Desktop: Credit cost in center */}
+        <div className="text-center hidden sm:block">
           <p className="text-xs text-gray-500 mb-1">This product costs</p>
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
             1 Credit
           </div>
         </div>
 
-        <Button
-          onClick={() => window.open("https://toolstolaunch.com/buy-credits", "_blank")}
-          size="sm"
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 py-2 text-sm"
-        >
-          <CreditCard className="w-4 h-4 mr-1" />
-          Buy Credits
-        </Button>
+        {/* Buy Credits button and mobile credit cost */}
+        <div className="flex flex-col items-end">
+          <Button
+            onClick={() => window.open("https://toolstolaunch.com/buy-credits", "_blank")}
+            size="sm"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 py-2 text-sm"
+          >
+            <CreditCard className="w-4 h-4 mr-1" />
+            Buy Credits
+          </Button>
+
+          {/* Mobile: Credit cost below button */}
+          <div className="text-center mt-2 sm:hidden">
+            <p className="text-xs text-gray-500 mb-1">This product costs</p>
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              1 Credit
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
