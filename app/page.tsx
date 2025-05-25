@@ -4,9 +4,6 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mic, Play, Pause, ArrowRight, Check, Sparkles, Clock, FileText, ArrowLeft, CreditCard } from "lucide-react"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 const questions = [
   {
@@ -62,6 +59,7 @@ export default function AudioFlashcards() {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle")
   const [recordings, setRecordings] = useState<{ [key: number]: Blob }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState("")
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -148,41 +146,51 @@ export default function AudioFlashcards() {
 
   const submitAnswers = async () => {
     setIsSubmitting(true)
+    setUploadProgress("Preparing files...")
 
     try {
       const audioUrls: { [key: string]: string } = {}
-      const timestamp = Date.now()
-      const sessionId = Math.random().toString(36).substring(2, 15)
+      const totalFiles = Object.keys(recordings).length
 
-      // Upload each recording to Supabase Storage
+      // Upload each recording and get URLs
+      let uploadedCount = 0
       for (const [questionIndex, blob] of Object.entries(recordings)) {
         const questionNumber = Number.parseInt(questionIndex) + 1
-        const fileName = `${sessionId}_question_${questionNumber}_${timestamp}.webm`
+        setUploadProgress(`Uploading audio ${uploadedCount + 1} of ${totalFiles}...`)
 
-        // Upload to Supabase Storage
-        const { data, error } = await supabase.storage.from("audio-recordings").upload(fileName, blob, {
-          contentType: "audio/webm",
-          upsert: false,
+        // Convert blob to File with .mp4 extension
+        const audioFile = new File([blob], `question_${questionNumber}.mp4`, {
+          type: "audio/mp4",
         })
 
-        if (error) {
-          console.error("Upload error:", error)
-          throw new Error(`Failed to upload audio for question ${questionNumber}: ${error.message}`)
+        // Create FormData for file upload
+        const uploadFormData = new FormData()
+        uploadFormData.append("file", audioFile)
+
+        // Upload to Vercel Blob
+        const uploadResponse = await fetch("/api/upload-audio", {
+          method: "POST",
+          body: uploadFormData,
+        })
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json()
+          throw new Error(`Failed to upload audio for question ${questionNumber}: ${errorData.error}`)
         }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName)
-
-        audioUrls[`question_${questionNumber}_url`] = urlData.publicUrl
+        const uploadResult = await uploadResponse.json()
+        audioUrls[`question_${questionNumber}_url`] = uploadResult.url
+        uploadedCount++
       }
 
-      // Send data to webhook with audio URLs
+      setUploadProgress("Sending to webhook...")
+
+      // Send data directly to webhook with audio URLs (skip Supabase for now)
       const webhookData = {
         email: email,
         audio_urls: audioUrls,
         questions_data: questions,
         submission_time: new Date().toISOString(),
-        session_id: sessionId,
       }
 
       const response = await fetch("https://hook.eu2.make.com/rdcc15sij24hfvydepw37lbgban7f10g", {
@@ -193,14 +201,17 @@ export default function AudioFlashcards() {
         body: JSON.stringify(webhookData),
       })
 
-      if (response.ok) {
-        setAppState("submitted")
-      } else {
-        throw new Error(`Webhook failed with status: ${response.status}`)
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Webhook failed: ${response.status} - ${errorText}`)
       }
+
+      setUploadProgress("Complete!")
+      setAppState("submitted")
     } catch (error) {
       console.error("Error submitting answers:", error)
-      alert(`Failed to submit answers: ${error.message}. Please try again.`)
+      alert(`Failed to submit answers: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setUploadProgress("")
     } finally {
       setIsSubmitting(false)
     }
@@ -522,7 +533,7 @@ export default function AudioFlashcards() {
                     {isSubmitting ? (
                       <>
                         <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Creating Resume...
+                        {uploadProgress || "Creating Resume..."}
                       </>
                     ) : (
                       <>
