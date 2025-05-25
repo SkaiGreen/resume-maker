@@ -160,20 +160,25 @@ export default function AudioFlashcards() {
         const questionNumber = Number.parseInt(questionIndex) + 1
         const fileName = `${sessionId}_question_${questionNumber}_${timestamp}.webm`
 
-        // Upload to Supabase Storage
+        console.log(`Uploading ${fileName} to audio-recordings bucket...`)
+
+        // Upload to Supabase Storage with better error handling
         const { data, error } = await supabase.storage.from("audio-recordings").upload(fileName, blob, {
           contentType: "audio/webm",
           upsert: false,
         })
 
         if (error) {
-          console.error("Upload error:", error)
+          console.error("Supabase upload error:", error)
           throw new Error(`Failed to upload audio for question ${questionNumber}: ${error.message}`)
         }
+
+        console.log(`Successfully uploaded ${fileName}:`, data)
 
         // Get public URL
         const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName)
 
+        console.log(`Public URL for ${fileName}:`, urlData.publicUrl)
         audioUrls[`question_${questionNumber}_url`] = urlData.publicUrl
       }
 
@@ -187,6 +192,8 @@ export default function AudioFlashcards() {
         session_id: sessionId,
       }
 
+      console.log("Sending webhook data:", webhookData)
+
       const response = await fetch("https://hook.eu2.make.com/rdcc15sij24hfvydepw37lbgban7f10g", {
         method: "POST",
         headers: {
@@ -196,13 +203,16 @@ export default function AudioFlashcards() {
       })
 
       if (response.ok) {
+        console.log("Webhook sent successfully")
         setAppState("submitted")
       } else {
-        throw new Error(`Webhook failed with status: ${response.status}`)
+        const errorText = await response.text()
+        console.error("Webhook error response:", errorText)
+        throw new Error(`Webhook failed with status: ${response.status} - ${errorText}`)
       }
     } catch (error) {
       console.error("Error submitting answers:", error)
-      alert(`Failed to submit answers: ${error.message}. Please try again.`)
+      alert(`Failed to submit answers: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`)
     } finally {
       setIsSubmitting(false)
     }
