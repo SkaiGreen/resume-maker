@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mic, Play, Pause, ArrowRight, Check, Sparkles, Clock, FileText, ArrowLeft, CreditCard } from "lucide-react"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 const questions = [
   {
@@ -54,12 +57,12 @@ type AppState = "welcome" | "questions" | "submitted"
 
 export default function AudioFlashcards() {
   const [appState, setAppState] = useState<AppState>("welcome")
+  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [recordingState, setRecordingState] = useState<RecordingState>("idle")
   const [recordings, setRecordings] = useState<{ [key: number]: Blob }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState("")
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -146,51 +149,42 @@ export default function AudioFlashcards() {
 
   const submitAnswers = async () => {
     setIsSubmitting(true)
-    setUploadProgress("Preparing files...")
 
     try {
       const audioUrls: { [key: string]: string } = {}
-      const totalFiles = Object.keys(recordings).length
+      const timestamp = Date.now()
+      const sessionId = Math.random().toString(36).substring(2, 15)
 
-      // Upload each recording and get URLs
-      let uploadedCount = 0
+      // Upload each recording to Supabase Storage
       for (const [questionIndex, blob] of Object.entries(recordings)) {
         const questionNumber = Number.parseInt(questionIndex) + 1
-        setUploadProgress(`Uploading audio ${uploadedCount + 1} of ${totalFiles}...`)
+        const fileName = `${sessionId}_question_${questionNumber}_${timestamp}.webm`
 
-        // Convert blob to File with .mp4 extension
-        const audioFile = new File([blob], `question_${questionNumber}.mp4`, {
-          type: "audio/mp4",
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage.from("audio-recordings").upload(fileName, blob, {
+          contentType: "audio/webm",
+          upsert: false,
         })
 
-        // Create FormData for file upload
-        const uploadFormData = new FormData()
-        uploadFormData.append("file", audioFile)
-
-        // Upload to Vercel Blob
-        const uploadResponse = await fetch("/api/upload-audio", {
-          method: "POST",
-          body: uploadFormData,
-        })
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json()
-          throw new Error(`Failed to upload audio for question ${questionNumber}: ${errorData.error}`)
+        if (error) {
+          console.error("Upload error:", error)
+          throw new Error(`Failed to upload audio for question ${questionNumber}: ${error.message}`)
         }
 
-        const uploadResult = await uploadResponse.json()
-        audioUrls[`question_${questionNumber}_url`] = uploadResult.url
-        uploadedCount++
+        // Get public URL
+        const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName)
+
+        audioUrls[`question_${questionNumber}_url`] = urlData.publicUrl
       }
 
-      setUploadProgress("Sending to webhook...")
-
-      // Send data directly to webhook with audio URLs (skip Supabase for now)
+      // Send data to webhook with audio URLs
       const webhookData = {
+        full_name: fullName,
         email: email,
         audio_urls: audioUrls,
         questions_data: questions,
         submission_time: new Date().toISOString(),
+        session_id: sessionId,
       }
 
       const response = await fetch("https://hook.eu2.make.com/rdcc15sij24hfvydepw37lbgban7f10g", {
@@ -201,27 +195,28 @@ export default function AudioFlashcards() {
         body: JSON.stringify(webhookData),
       })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Webhook failed: ${response.status} - ${errorText}`)
+      if (response.ok) {
+        setAppState("submitted")
+      } else {
+        throw new Error(`Webhook failed with status: ${response.status}`)
       }
-
-      setUploadProgress("Complete!")
-      setAppState("submitted")
     } catch (error) {
       console.error("Error submitting answers:", error)
-      alert(`Failed to submit answers: ${error instanceof Error ? error.message : "Unknown error"}`)
-      setUploadProgress("")
+      alert(`Failed to submit answers: ${error.message}. Please try again.`)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const startQuestions = () => {
-    if (email.trim() && email.includes("@")) {
+    if (fullName.trim() && email.trim() && email.includes("@")) {
       setAppState("questions")
     } else {
-      alert("Please enter a valid email address")
+      if (!fullName.trim()) {
+        alert("Please enter your full name")
+      } else if (!email.trim() || !email.includes("@")) {
+        alert("Please enter a valid email address")
+      }
     }
   }
 
@@ -325,6 +320,18 @@ export default function AudioFlashcards() {
                       <p className="text-xs sm:text-sm font-medium text-gray-700">Word Document</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Full Name input */}
+                <div className="mb-4 sm:mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Enter your full name</label>
+                  <Input
+                    type="text"
+                    placeholder="John Smith"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-0 text-gray-900 placeholder-gray-400 text-sm sm:text-base"
+                  />
                 </div>
 
                 {/* Email input */}
@@ -533,7 +540,7 @@ export default function AudioFlashcards() {
                     {isSubmitting ? (
                       <>
                         <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        {uploadProgress || "Creating Resume..."}
+                        Creating Resume...
                       </>
                     ) : (
                       <>
