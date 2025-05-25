@@ -57,7 +57,6 @@ type AppState = "welcome" | "questions" | "submitted"
 
 export default function AudioFlashcards() {
   const [appState, setAppState] = useState<AppState>("welcome")
-  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [recordingState, setRecordingState] = useState<RecordingState>("idle")
@@ -160,39 +159,31 @@ export default function AudioFlashcards() {
         const questionNumber = Number.parseInt(questionIndex) + 1
         const fileName = `${sessionId}_question_${questionNumber}_${timestamp}.webm`
 
-        console.log(`Uploading ${fileName} to audio-recordings bucket...`)
-
-        // Upload to Supabase Storage with better error handling
+        // Upload to Supabase Storage
         const { data, error } = await supabase.storage.from("audio-recordings").upload(fileName, blob, {
           contentType: "audio/webm",
           upsert: false,
         })
 
         if (error) {
-          console.error("Supabase upload error:", error)
+          console.error("Upload error:", error)
           throw new Error(`Failed to upload audio for question ${questionNumber}: ${error.message}`)
         }
-
-        console.log(`Successfully uploaded ${fileName}:`, data)
 
         // Get public URL
         const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName)
 
-        console.log(`Public URL for ${fileName}:`, urlData.publicUrl)
         audioUrls[`question_${questionNumber}_url`] = urlData.publicUrl
       }
 
       // Send data to webhook with audio URLs
       const webhookData = {
-        full_name: fullName,
         email: email,
         audio_urls: audioUrls,
         questions_data: questions,
         submission_time: new Date().toISOString(),
         session_id: sessionId,
       }
-
-      console.log("Sending webhook data:", webhookData)
 
       const response = await fetch("https://hook.eu2.make.com/rdcc15sij24hfvydepw37lbgban7f10g", {
         method: "POST",
@@ -203,30 +194,23 @@ export default function AudioFlashcards() {
       })
 
       if (response.ok) {
-        console.log("Webhook sent successfully")
         setAppState("submitted")
       } else {
-        const errorText = await response.text()
-        console.error("Webhook error response:", errorText)
-        throw new Error(`Webhook failed with status: ${response.status} - ${errorText}`)
+        throw new Error(`Webhook failed with status: ${response.status}`)
       }
     } catch (error) {
       console.error("Error submitting answers:", error)
-      alert(`Failed to submit answers: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`)
+      alert(`Failed to submit answers: ${error.message}. Please try again.`)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const startQuestions = () => {
-    if (fullName.trim() && email.trim() && email.includes("@")) {
+    if (email.trim() && email.includes("@")) {
       setAppState("questions")
     } else {
-      if (!fullName.trim()) {
-        alert("Please enter your full name")
-      } else if (!email.trim() || !email.includes("@")) {
-        alert("Please enter a valid email address")
-      }
+      alert("Please enter a valid email address")
     }
   }
 
@@ -330,18 +314,6 @@ export default function AudioFlashcards() {
                       <p className="text-xs sm:text-sm font-medium text-gray-700">Word Document</p>
                     </div>
                   </div>
-                </div>
-
-                {/* Full Name input */}
-                <div className="mb-4 sm:mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Enter your full name</label>
-                  <Input
-                    type="text"
-                    placeholder="John Smith"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-0 text-gray-900 placeholder-gray-400 text-sm sm:text-base"
-                  />
                 </div>
 
                 {/* Email input */}
